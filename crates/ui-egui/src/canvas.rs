@@ -3048,6 +3048,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let by_line = app.session.stamp_by_line(&author);
     let mut stamp_placed = false;
     let mut image_action: Option<crate::edit_text_ui::ImageAction> = None;
+    let mut page_action: Option<crate::page_menu::Action> = None;
     let custom_stamp = match app.quick_tool {
         QuickTool::CustomStamp(i) => app.custom_stamps.get(i).cloned(),
         _ => None,
@@ -4031,6 +4032,13 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                     ui.separator();
                 }
             }
+            // Local page-menu items (Copy Page as Image, ...). They come after the picture
+            // items and before the comment items, so the order is the page menu's.
+            if view.comments.selected.is_none()
+                && let Some((page, _)) = view.comments.context_at
+            {
+                page_action = crate::page_menu::items(ui, view.id, page);
+            }
             canvas_action = comments::context_menu(ui, view, info, prefs, allowed).or(copy_image);
         });
         (wanted, visible_now)
@@ -4286,6 +4294,9 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         Some(LinkTarget::RemoteGoTo { file, destination, .. }) => remote_open = Some((view.id, file, destination)),
         Some(LinkTarget::Other(s)) => app.notify_fmt("This PDF uses the unsupported {s} action.", &[("s", &s)]),
         None => {}
+    }
+    if let Some(action) = page_action {
+        action(app);
     }
     if tool == QuickTool::Crop && cropped {
         tool = QuickTool::Select;

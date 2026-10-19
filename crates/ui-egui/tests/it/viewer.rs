@@ -1693,6 +1693,28 @@ fn right_click_on_a_picture_copies_it_at_full_size() {
     assert_eq!(rgba, px.into_raw(), "the image's own pixels, not a rendering of the page");
 }
 
+/// The page menu's Copy Page as Image renders the whole page at 150 dpi, not at the zoom.
+#[test]
+fn right_click_on_the_page_copies_it_as_an_image() {
+    let mut h = harness();
+    h.state_mut().system_clipboard = false;
+    let i = h.state().active.unwrap();
+    let r = h.state().views[i].page_screen_rect(0).expect("on screen");
+    // Away from the text at y = 150 (the page is 200 × 300 points).
+    let at = egui::pos2(r.left() + r.width() * 0.8, r.top() + r.height() * 0.2);
+    h.hover_at(at);
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: true, modifiers: Default::default() });
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: false, modifiers: Default::default() });
+    h.run_steps(2);
+    h.get_by_label("Copy Page as Image").click();
+    h.run_steps(2);
+    let (w, hgt, px) = h.state().last_snapshot.clone().expect("the page was copied");
+    assert_eq!((w, hgt), (417, 625), "200 × 300 pt at 150 dpi");
+    let pixels: &[u8] = px.as_ref();
+    assert!(pixels.as_chunks::<4>().0.iter().any(|p| p[..3] != [255, 255, 255]), "the page text is drawn");
+}
+
 /// A picture drawn through grouped Form artwork with a caption over it (as Word, InDesign and
 /// scanners with OCR write them): one click still selects it, and ⌘C copies the picture.
 #[test]

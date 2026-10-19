@@ -1578,6 +1578,17 @@ evidence = ["crates/ui-egui/tests/it/viewer.rs::marquee_zoom_and_snapshot"]
 notes = "copies the area at the current zoom to the clipboard as an image"
 
 [[feature]]
+id = "view.copy-page-image"
+title = "Copy the page as an image"
+area = "B"
+tier = "P2"
+milestone = "M3"
+status = "shipped"
+commands = []
+tools = ["page_render"]
+evidence = ["crates/ui-egui/tests/it/viewer.rs::right_click_on_the_page_copies_it_as_an_image"]
+notes = "The page menu's Copy Page as Image renders the whole page at 150 dpi and puts it on the clipboard, honouring hidden layers and hidden comments and leaving out reading colours; page_render is the headless equivalent. The web build can't put images on the clipboard yet."
+[[feature]]
 id = "view.copy-image"
 title = "Select an image on the page and copy it"
 area = "B"

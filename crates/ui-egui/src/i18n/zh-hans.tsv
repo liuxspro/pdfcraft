@@ -477,6 +477,7 @@
 	Replace Image…	替换图像…
 	Save Image As…	图像另存为…
 	Copy Image	复制图像
+	Copy Page as Image	复制页面为图像
 	The image has been copied ({w} × {h} pixels)	图像已复制（{w} × {h} 像素）
 	Couldn't copy the image: {e}	无法复制图像：{e}
 	Copy Image in Original Format	以原始格式复制图像
