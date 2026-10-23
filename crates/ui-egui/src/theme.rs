@@ -229,6 +229,34 @@ pub const SYSTEM_HEBREW_FALLBACK: &str = "system-hebrew-fallback";
 /// The name of the installed Hangul (Korean) face [`installed_font_definitions`] may add.
 pub const SYSTEM_HANGUL_FALLBACK: &str = "system-hangul-fallback";
 
+/// Where a Chinese system fallback belongs in a family `stack`: before the first Japanese
+/// craft-fonts face, so a line is not drawn from two faces with different vertical metrics.
+///
+/// Without Japanese faces (a build without `CRAFT_FONTS_DIR`) that position does not exist, and
+/// appending would leave the Chinese fallback after the Hangul one: Han characters, which Malgun
+/// has as Hanja, would then draw from Malgun. So it goes before the first script fallback
+/// instead. `Need::Other` keeps its place at the end of every family, so this returns `None`.
+#[cfg(not(target_arch = "wasm32"))]
+fn fallback_insert_at(stack: &[String], japanese: &[String], need: crate::system_fonts::Need) -> Option<usize> {
+    use crate::system_fonts::Need;
+    match need {
+        Need::Other => None,
+        Need::Hans | Need::Hant => stack.iter().position(|n| japanese.contains(n)).or_else(|| {
+            [
+                SYSTEM_DEVANAGARI_FALLBACK,
+                SYSTEM_TELUGU_FALLBACK,
+                SYSTEM_SINHALA_FALLBACK,
+                SYSTEM_TAMIL_FALLBACK,
+                SYSTEM_HEBREW_FALLBACK,
+                SYSTEM_HANGUL_FALLBACK,
+            ]
+            .iter()
+            .filter_map(|name| stack.iter().position(|n| n == name))
+            .min()
+        }),
+    }
+}
+
 /// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
 /// already installed on this machine. It only draws characters no embedded face has.
 ///
@@ -243,7 +271,8 @@ pub const SYSTEM_HANGUL_FALLBACK: &str = "system-hangul-fallback";
 /// Installed Devanagari, Telugu, Sinhala, Tamil, Hebrew and Hangul faces, when there are, end
 /// every family just before that one, so Hindi, Telugu (#1531), Sinhala and Tamil (#1688) and
 /// Korean text, such as a file name or a tab title, and Hebrew file names (#586) draw in a build
-/// without such faces.
+/// without such faces. Without Japanese faces, a Chinese system face goes before them: Hangul
+/// (Malgun) also has Han characters as Hanja and would otherwise draw them.
 ///
 /// `PDFCRAFT_SYSTEM_FONTS=0` leaves them out.
 pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
@@ -277,10 +306,7 @@ pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
             fonts.font_data.insert(SYSTEM_FALLBACK.to_owned(), data);
             let japanese: Vec<String> = pdfcraft_fonts::ui_japanese_fonts().iter().map(|f| f.name()).collect();
             for stack in fonts.families.values_mut() {
-                let at = match need {
-                    Need::Other => None,
-                    Need::Hans | Need::Hant => stack.iter().position(|n| japanese.contains(n)),
-                };
+                let at = fallback_insert_at(stack, &japanese, need);
                 stack.insert(at.unwrap_or(stack.len()), SYSTEM_FALLBACK.to_owned());
             }
         }
@@ -768,5 +794,52 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Without Japanese faces the Chinese fallback cannot go "before the Japanese faces", so it
+    /// goes before the script fallbacks: after Hangul it would lose every Han character to
+    /// Malgun's Hanja.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn chinese_fallback_precedes_hangul_without_japanese_faces() {
+        use crate::system_fonts::Need;
+        let stack = vec!["Inter".to_owned(), SYSTEM_HANGUL_FALLBACK.to_owned()];
+        assert_eq!(fallback_insert_at(&stack, &[], Need::Hans), Some(1));
+        assert_eq!(fallback_insert_at(&stack, &[], Need::Hant), Some(1));
+        let with_devanagari = vec!["Inter".to_owned(), SYSTEM_DEVANAGARI_FALLBACK.to_owned(), SYSTEM_HANGUL_FALLBACK.to_owned()];
+        assert_eq!(fallback_insert_at(&with_devanagari, &[], Need::Hans), Some(1));
+    }
+
+    /// With Japanese faces present the Chinese fallback still goes before the first one, so no
+    /// line mixes the two faces' vertical metrics.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn chinese_fallback_precedes_the_first_japanese_face() {
+        use crate::system_fonts::Need;
+        let japanese = vec!["BIZ UDPGothic Regular".to_owned()];
+        let stack = vec!["Inter".to_owned(), "BIZ UDPGothic Regular".to_owned(), SYSTEM_HANGUL_FALLBACK.to_owned()];
+        assert_eq!(fallback_insert_at(&stack, &japanese, Need::Hans), Some(1));
+        assert_eq!(fallback_insert_at(&stack, &japanese, Need::Hant), Some(1));
+    }
+
+    /// The general installed face stays the last fallback outside Chinese.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn other_fallback_stays_last() {
+        use crate::system_fonts::Need;
+        let japanese = vec!["BIZ UDPGothic Regular".to_owned()];
+        let stack = vec!["Inter".to_owned(), "BIZ UDPGothic Regular".to_owned(), SYSTEM_HANGUL_FALLBACK.to_owned()];
+        assert_eq!(fallback_insert_at(&stack, &japanese, Need::Other), None);
+        assert_eq!(fallback_insert_at(&["Inter".to_owned()], &[], Need::Other), None);
+    }
+
+    /// A family with neither Japanese faces nor script fallbacks has nowhere to insert into.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn chinese_fallback_has_no_position_in_a_bare_stack() {
+        use crate::system_fonts::Need;
+        let stack = vec!["Inter".to_owned(), "JetBrainsMono".to_owned()];
+        assert_eq!(fallback_insert_at(&stack, &[], Need::Hans), None);
+        assert_eq!(fallback_insert_at(&stack, &[], Need::Hant), None);
     }
 }
