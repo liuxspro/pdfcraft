@@ -20,7 +20,7 @@ pub(crate) type Action = Box<dyn FnOnce(&mut PdfCraftApp)>;
 /// landed on a page.
 pub(crate) fn items(ui: &mut egui::Ui, id: DocId, page: usize) -> Option<Action> {
     let mut action: Option<Action> = None;
-    if ui.button(tl!("Copy Page as Image")).clicked() {
+    if ui.button("复制页面为图像").clicked() {
         action = Some(Box::new(move |app| copy_page_as_image(app, id, page)));
         ui.close();
     }

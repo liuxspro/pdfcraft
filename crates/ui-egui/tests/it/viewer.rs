@@ -1707,7 +1707,7 @@ fn right_click_on_the_page_copies_it_as_an_image() {
     h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: true, modifiers: Default::default() });
     h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: false, modifiers: Default::default() });
     h.run_steps(2);
-    h.get_by_label("Copy Page as Image").click();
+    h.get_by_label("复制页面为图像").click();
     h.run_steps(2);
     let (w, hgt, px) = h.state().last_snapshot.clone().expect("the page was copied");
     assert_eq!((w, hgt), (417, 625), "200 × 300 pt at 150 dpi");
