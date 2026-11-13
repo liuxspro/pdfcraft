@@ -1,0 +1,91 @@
+name: Release (Windows only)
+
+# Personal-branch workflow: build Windows alone (x64 and arm64) and keep the MSI and the portable
+# zip as workflow artifacts. The upstream release.yml calls storytold/craft-common-actions' shared
+# release workflow, whose inputs can only turn off web, riscv64, freebsd, arch and server: macOS,
+# Linux and Flatpak run unconditionally, so "only Windows" cannot be asked for there. This file
+# therefore runs packaging/windows/package.ps1 directly. It signs nothing when the signing secrets
+# are absent, and creates no GitHub Release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override for a test run, e.g. 0.2.0-rc.1 (empty: Cargo.toml)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # The suite's craft-fonts pin, as upstream release.yml carries it.
+  CRAFT_FONTS_REF: b076417b5880bd4154bd22f00695b1d28c6bea83
+  WIX_VERSION: "5.0.2"
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      # One architecture failing still tells us what the other did.
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc, runner: windows-latest }
+          # arm64 builds natively on GitHub's Arm runner (free for public repositories).
+          - { arch: arm64, target: aarch64-pc-windows-msvc, runner: windows-11-arm }
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+      RUST_BACKTRACE: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out craft-fonts
+        uses: storytold/craft-common-actions/actions/checkout-craft-fonts@main
+        with:
+          ref: ${{ env.CRAFT_FONTS_REF }}
+      # Reads craft-i18n.rev and exports CRAFT_I18N_DIR / CRAFT_I18N_REQUIRED=1 for the build.
+      - uses: storytold/craft-common-actions/actions/checkout-craft-i18n@main
+      - uses: step-security/dtolnay-rust-toolchain@8dd607977d06adf4ed49b190381e74c17a9dd25f # v1.0.0
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: step-security/rust-cache@8871c8ba063416da7c32246932ea6ae08700453e # v2.9.2
+        with:
+          key: release-windows-${{ matrix.arch }}
+      - name: Apply version override
+        if: inputs.version != ''
+        shell: bash
+        run: cargo xtask version set "${{ inputs.version }}"
+      - name: Install WiX
+        uses: storytold/craft-common-actions/actions/install-wix@main
+        with:
+          wix-version: ${{ env.WIX_VERSION }}
+      # Emits pdfcraft-<version>-windows-<arch>.msi and -portable.zip into dist/release. Signing is
+      # sign.ps1's job: with no certificate secrets it warns and packages unsigned.
+      - name: Build, sign, package
+        shell: pwsh
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: "1"
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_CERT_PROFILE: ${{ secrets.AZURE_CERT_PROFILE }}
+        run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pdfcraft-windows-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
