@@ -883,6 +883,8 @@ pub(crate) enum PageMenuAction {
     AddComment(usize, [f64; 2]),
     AddBookmark,
     TakeSnapshot,
+    /// Copy the whole page as an image, with no framing.
+    CopyPageAsImage(usize),
     EditPdf,
     AddText,
     AddImage,
@@ -956,6 +958,8 @@ pub(crate) fn default_page_context_menu(ui: &mut egui::Ui, page: usize, at: [f64
     }
     pick(ui.add_enabled(perms.can_assemble, egui::Button::new(tl!("Add bookmark"))), ui, A::AddBookmark);
     pick(ui.add_enabled(perms.can_copy, egui::Button::new(tl!("Take a snapshot"))), ui, A::TakeSnapshot);
+    // 个人分支：这一项和它的提示文字不走 i18n，直接硬编码中文。
+    pick(ui.add_enabled(perms.can_copy, egui::Button::new("复制页面为图像")), ui, A::CopyPageAsImage(page));
 
     ui.separator();
 
@@ -3778,6 +3782,9 @@ fn apply_frame_requests(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, 
         }
         Some(PageMenuAction::TakeSnapshot) => {
             app.quick_tool = QuickTool::Snapshot;
+        }
+        Some(PageMenuAction::CopyPageAsImage(page)) => {
+            app.copy_page_as_image(index, page);
         }
         Some(PageMenuAction::EditPdf) => {
             app.quick_tool = QuickTool::EditText;

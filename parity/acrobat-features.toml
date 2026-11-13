@@ -1602,6 +1602,18 @@ evidence = ["crates/ui-egui/tests/it/viewer.rs::marquee_zoom_and_snapshot", "cra
 notes = "copies the area to the clipboard as an image, at 300 ppi or the current zoom if that is finer (#5716), or as fine as the renderer draws in one tile (4096 pixels a side), drawn while the app waits; the area then stays outlined with Print area… and Save as image… (PNG) under it until another tool is chosen (print.selected-area). Missing: a choice of resolution, and a selection that stays active to copy later"
 
 [[feature]]
+id = "view.copy-page-image"
+title = "Copy Page as Image (the whole page, with no framing)"
+area = "B"
+tier = "P2"
+milestone = "M3"
+status = "shipped"
+commands = []
+tools = ["page_render"]
+evidence = ["crates/ui-egui/tests/it/viewer.rs::right_click_on_the_page_copies_the_whole_page_as_an_image"]
+notes = "The page menu copies the whole page, with no framing, by the same rules as Take a snapshot (view.snapshot): 300 ppi, or the current zoom when that is finer, at most 4096 pixels a side; page_render is the headless equivalent."
+
+[[feature]]
 id = "view.copy-image"
 title = "Select an image on the page and copy it"
 area = "B"

@@ -1192,6 +1192,30 @@ trailer << /Root 1 0 R >>
     assert!(at(w / 2, hgt / 2) > 200, "and the page around it is white");
 }
 
+/// The page menu's Copy Page as Image takes the whole page, with no framing and whatever the
+/// zoom, at the same resolution rules as a snapshot.
+#[test]
+fn right_click_on_the_page_copies_the_whole_page_as_an_image() {
+    let mut h = harness();
+    h.state_mut().system_clipboard = false;
+    let i = h.state().active.unwrap();
+    let r = h.state().views[i].page_screen_rect(0).expect("on screen");
+    // Away from the text at y = 150 (the page is 200 × 300 points).
+    let at = egui::pos2(r.left() + r.width() * 0.8, r.top() + r.height() * 0.2);
+    h.hover_at(at);
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: true, modifiers: Default::default() });
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed: false, modifiers: Default::default() });
+    h.run_steps(2);
+    h.get_by_label("复制页面为图像").click();
+    h.run_steps(2);
+    let (w, hgt, px) = h.state().last_snapshot.clone().expect("the page was copied");
+    let at_300_ppi = |points: f64| points * 300.0 / 72.0;
+    assert!((f64::from(w) - at_300_ppi(200.0)).abs() <= 1.0, "{w} px wide, not 200 pt at 300 ppi");
+    assert!((f64::from(hgt) - at_300_ppi(300.0)).abs() <= 1.0, "{hgt} px tall, not 300 pt at 300 ppi");
+    assert!(px.as_chunks::<4>().0.iter().any(|p| p[..3] != [255, 255, 255]), "the page text is drawn");
+}
+
 #[test]
 fn fit_visible_zooms_to_the_content_width() {
     let mut h = harness();

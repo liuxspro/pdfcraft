@@ -251,6 +251,26 @@ impl PdfCraftApp {
         }
         Ok((out.width, out.height, out.rgba))
     }
+
+    /// Copy Page as Image: the whole of `page`, with no framing, by the same resolution rules as
+    /// Snapshot. Unlike Snapshot it asks for nothing from the document, so a document that forbids
+    /// copying is refused before anything is rendered.
+    pub(crate) fn copy_page_as_image(&mut self, index: usize, page: usize) {
+        let Some(id) = self.views.get(index).map(|v| v.id) else { return };
+        if !self.may_copy(id) {
+            return;
+        }
+        // A newer copy wins over a whole-document copy still reading its pages.
+        self.document_copy = None;
+        let Some((w, h)) = self.session.get(id).and_then(|d| d.info.pages.get(page)).map(|p| (p.width, p.height)) else {
+            self.notify("无法复制页面：没有这一页".to_string());
+            return;
+        };
+        match self.snapshot(index, page, [0.0, 0.0, w, h]) {
+            Ok((w, h)) => self.notify(format!("页面已复制（{w} × {h} 像素）")),
+            Err(e) => self.notify(format!("无法复制页面：{e}")),
+        }
+    }
 }
 
 /// The fewest pixels per point a snapshot is drawn at: 300 ppi, so what it copies stays readable
